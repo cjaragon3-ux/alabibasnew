@@ -63,7 +63,7 @@
 
   .track {
     width: calc(100% - 40px);
-    max-width: 330px;
+    max-width: 420px;
     margin: 40px auto 0;
     background: #b0b998;
     border-radius: 16px;
@@ -131,6 +131,28 @@
 
   .message[hidden] { display: none; }
   .message.error { color: #b3261e; }
+
+
+  /* ---------- Order result / timeline ---------- */
+  .result { margin: 22px auto 0; width: calc(100% - 40px); max-width: 420px; background: #fbf8f1; border: 1px solid #d8cfba; border-radius: 16px; padding: 18px 18px 8px; }
+  .result[hidden] { display: none; }
+  .result h3 { font-size: 1.05rem; font-weight: 600; }
+  .result .meta { font-size: 0.72rem; color: #555; margin: 2px 0 14px; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; background: #a36233; color: #fff; font-size: 0.7rem; font-weight: 600; }
+  .badge.delivered { background: #2c3320; } .badge.cancelled { background: #b3261e; }
+  .steps { list-style: none; margin: 14px 0 16px; }
+  .steps li { position: relative; padding: 0 0 16px 28px; font-size: 0.75rem; color: #888; }
+  .steps li::before { content: ""; position: absolute; left: 0; top: 2px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #b0b998; background: #fff; }
+  .steps li::after { content: ""; position: absolute; left: 6px; top: 18px; bottom: 0; width: 2px; background: #d8cfba; }
+  .steps li:last-child::after { display: none; }
+  .steps li.done { color: #000; }
+  .steps li.done::before { background: #a36233; border-color: #a36233; }
+  .steps li.now { font-weight: 600; }
+  .steps small { display: block; font-weight: 400; color: #666; font-size: 0.68rem; }
+  .items { border-top: 1px solid #eee6d3; padding: 10px 0; font-size: 0.72rem; }
+  .items div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  .items .total { font-weight: 600; border-top: 1px solid #eee6d3; margin-top: 4px; padding-top: 8px; }
+  .courier { font-size: 0.72rem; padding: 0 0 12px; }
 
   /* ---------- Quick links ---------- */
   .quick-links {
@@ -244,6 +266,8 @@
     </form>
   </section>
 
+  <section class="result" id="result" aria-live="polite" hidden></section>
+
   <!-- Quick links -->
   <nav class="quick-links" aria-label="Help and services">
     <a href="orderstatus.html" class="current"><i class="fa-solid fa-box"></i><span>ORDER STATUS</span></a>
@@ -302,11 +326,69 @@
     msg.hidden = false;
   }
 
-  /* Replace this with a real lookup once orders are stored somewhere
-     (e.g. fetch("/api/orders?...") to your server). */
-  function lookupOrder(email, orderNumber) {
-    show("We couldn't find an order matching those details. Please check them or contact us at alabibas.apparel@gmail.com.", true);
+  var API = "/admin/orders_api.php";
+  var resultEl = document.getElementById("result");
+  var FLOW = [["placed", "Order placed"], ["processing", "Preparing your order"], ["shipped", "Shipped"], ["out_for_delivery", "Out for delivery"], ["delivered", "Delivered"]];
+
+  function peso(n) { return "\u20B1" + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function fmt(d) { var t = new Date(String(d).replace(" ", "T")); return isNaN(t) ? d : t.toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }); }
+
+  function renderOrder(o) {
+    resultEl.innerHTML = "";
+    var stamp = {}; o.events.forEach(function (e) { stamp[e.status] = e; });
+    resultEl.appendChild(el("h3", "", "Order " + o.order_number));
+    var meta = el("p", "meta", "Placed " + fmt(o.created_at) + " \u00B7 " + (o.payment || "Payment on file") + " \u00B7 ");
+    var b = el("span", "badge " + o.status, o.status === "cancelled" ? "Cancelled" : (FLOW.filter(function (f) { return f[0] === o.status; })[0] || [0, o.status])[1]);
+    meta.appendChild(b); resultEl.appendChild(meta);
+
+    var ul = el("ul", "steps");
+    if (o.status === "cancelled") {
+      o.events.forEach(function (e) { var li = el("li", "done", e.status === "cancelled" ? "Order cancelled" : e.message); li.appendChild(el("small", "", fmt(e.at))); ul.appendChild(li); });
+    } else {
+      var idx = FLOW.map(function (f) { return f[0]; }).indexOf(o.status);
+      FLOW.forEach(function (f, i) {
+        var li = el("li", i <= idx ? "done" + (i === idx ? " now" : "") : "", f[1]);
+        if (stamp[f[0]]) li.appendChild(el("small", "", fmt(stamp[f[0]].at) + (stamp[f[0]].message && stamp[f[0]].message !== f[1] ? " \u2013 " + stamp[f[0]].message : "")));
+        ul.appendChild(li);
+      });
+    }
+    resultEl.appendChild(ul);
+
+    if (o.courier || o.tracking_no) resultEl.appendChild(el("p", "courier", "Courier: " + (o.courier || "\u2013") + (o.tracking_no ? " \u00B7 Tracking no. " + o.tracking_no : "")));
+
+    var items = el("div", "items");
+    o.items.forEach(function (it) {
+      var r = el("div"); r.appendChild(el("span", "", it.qty + " \u00D7 " + it.name + (it.size ? " (" + it.size + ")" : "")));
+      r.appendChild(el("span", "", peso(it.qty * it.price))); items.appendChild(r);
+    });
+    var t = el("div", "total"); t.appendChild(el("span", "", "Total")); t.appendChild(el("span", "", peso(o.total))); items.appendChild(t);
+    resultEl.appendChild(items);
+    resultEl.hidden = false;
   }
+
+  function lookupOrder(email, orderNumber) {
+    resultEl.hidden = true;
+    show("Searching\u2026", false);
+    fetch(API + "?action=track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email, order: orderNumber }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (r) {
+        if (r.ok) { msg.hidden = true; renderOrder(r.j); return; }
+        show(r.j.error === "not_found" || !r.j.error
+          ? "We couldn't find an order matching those details. Please check them or contact us at alabibas.apparel@gmail.com."
+          : r.j.error, true);
+      })
+      .catch(function () { show("Cannot reach the server. Please try again.", true); });
+  }
+
+  // arriving from checkout: ?order=AB-...  (email is filled in for logged-in customers)
+  (function () {
+    var p = new URLSearchParams(location.search), u = null;
+    try { u = JSON.parse(localStorage.getItem("alabibasUser")); } catch (e) {}
+    if (u && u.email) emailEl.value = u.email;
+    if (p.get("order")) orderEl.value = p.get("order");
+    if (u && u.email && p.get("order")) lookupOrder(u.email, p.get("order"));
+  })();
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();

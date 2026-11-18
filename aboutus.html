@@ -715,7 +715,12 @@
     try { user = JSON.parse(localStorage.getItem("alabibasUser")); } catch (e) {}
     if (!box || !user) return;           // keeps the normal "Login / Register" link
 
-    box.textContent = "Hi, " + (user.name || "there") + " | ";
+    var profile = document.createElement("a");
+    profile.href = "userinfo.html";
+    profile.textContent = "Hi, " + (user.name || "there");
+    box.textContent = "";
+    box.appendChild(profile);
+    box.appendChild(document.createTextNode(" | "));
     var out = document.createElement("a");
     out.href = "#";
     out.textContent = "Logout";

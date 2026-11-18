@@ -302,7 +302,12 @@
     try { user = JSON.parse(localStorage.getItem(USER_KEY)); } catch (e) {}
     if (!user) return;
 
-    box.textContent = "Hi, " + (user.name || "there") + " | ";
+    var profile = document.createElement("a");
+    profile.href = "userinfo.html";
+    profile.textContent = "Hi, " + (user.name || "there");
+    box.textContent = "";
+    box.appendChild(profile);
+    box.appendChild(document.createTextNode(" | "));
     var out = document.createElement("a");
     out.href = "#";
     out.textContent = "Logout";

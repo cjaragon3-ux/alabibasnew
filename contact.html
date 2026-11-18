@@ -39,6 +39,15 @@
     z-index: 1;
   }
 
+  .login-reg {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 0.7rem;
+  }
+
+  .login-reg a:hover { text-decoration: underline; }
+
   header h1 { margin-bottom: 8px; line-height: 0; }
   header h1 img { max-height: 48px; width: auto; }
 
@@ -247,6 +256,7 @@
   /* ---------- Small screens ---------- */
   @media (max-width: 700px) {
     nav { gap: 8px 24px; }
+    .login-reg { position: static; margin-bottom: 8px; }
     .contact { grid-template-columns: 1fr; min-height: 0; }
     .contact-hero { min-height: 340px; }
     .footer-main { justify-content: center; padding-left: 20px; }
@@ -265,6 +275,7 @@
 
 <header>
   <h1><a href="index.html"><img src="images/logo.webp" alt="ALABIBAS"></a></h1>
+  <span class="login-reg" id="authBox"><a href="login.html?next=contact.html" id="authLink">Login / Register</a></span>
 
   <nav>
     <a href="index.html">Home</a>
@@ -340,6 +351,33 @@
     <p>&copy; 2026 Alabibas. All rights reserved.</p>
   </div>
 </footer>
+
+<script>
+  (function () {
+    var USER_KEY = "alabibasUser";
+    var box = document.getElementById("authBox");
+    var user = null;
+    try { user = JSON.parse(localStorage.getItem(USER_KEY)); } catch (e) {}
+    if (!user) return;
+
+    var profile = document.createElement("a");
+    profile.href = "userinfo.html";
+    profile.textContent = "Hi, " + (user.name || "there");
+    box.textContent = "";
+    box.appendChild(profile);
+    box.appendChild(document.createTextNode(" | "));
+
+    var out = document.createElement("a");
+    out.href = "#";
+    out.textContent = "Logout";
+    out.addEventListener("click", function (e) {
+      e.preventDefault();
+      localStorage.removeItem(USER_KEY);
+      location.reload();
+    });
+    box.appendChild(out);
+  })();
+</script>
 
 <script>
   document.getElementById("contact-form").addEventListener("submit", function (e) {

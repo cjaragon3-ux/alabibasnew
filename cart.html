@@ -877,11 +877,25 @@
       return;
     }
 
-    alert("Thank you! Your order has been placed.\nPayment method: " + selectedPayment());
-    localStorage.removeItem(CART_KEY);
-    document.getElementById("terms").checked = false;
-    document.getElementById("note").value = "";
-    render();
+    var btn = document.getElementById("checkoutBtn");
+    btn.disabled = true;
+    fetch("/admin/orders_api.php?action=place", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: getCart(), payment: selectedPayment(), note: document.getElementById("note").value })
+    })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (r) {
+        btn.disabled = false;
+        if (!r.ok) { alert(r.j.error || "Your order could not be placed. Please try again."); return; }
+        localStorage.removeItem(CART_KEY);
+        document.getElementById("terms").checked = false;
+        document.getElementById("note").value = "";
+        render();
+        alert("Thank you! Your order has been placed.\nOrder number: " + r.j.order_number + "\nYou can track it on the Order Status page.");
+        location.href = "orderstatus.html?order=" + encodeURIComponent(r.j.order_number);
+      })
+      .catch(function () { btn.disabled = false; alert("Cannot reach the server. Please try again."); });
   });
 
   // ----- warning popup before removing an item -----
